@@ -1032,30 +1032,48 @@ static bool fulltest_le(const uint *hash, const uint *target)
     return(rc);
 }
 
+static void encode_as_bigendian(const uint32_t value, uint8_t* dest)
+{
+  for (int i = 0; i < 4; ++i)
+    dest[3 - i] = ((value >> (8 * i)) & 0xFF);
+}
+
 int scanhash_neoscrypt(int thr_id, struct work *work, uint32_t max_nonce, uint64_t *hashes_done,
-    uint32_t profile)
+    uint32_t profile, const bool byteswap)
 {
     uint32_t _ALIGN(128) hash[8];
-    uint32_t *pdata = work->data;
-    uint32_t *ptarget = work->target;
+    uint32_t* nonce = &work->data[19];
+    uint32_t* ptarget = work->target;
+    const uint8_t* pdata = (const uint8_t*) work->data;
 
     const uint32_t Htarg = ptarget[7];
-    const uint32_t first_nonce = pdata[19];
+    const uint32_t first_nonce = *nonce;
 
-    while (pdata[19] < max_nonce && !work_restart[thr_id].restart)
+    uint8_t data[80];
+    if (byteswap)
+      {
+        pdata = data;
+        for (int i = 0; i < 20; ++i)
+          encode_as_bigendian (work->data[i], &data[4 * i]);
+      }
+
+    while (*nonce < max_nonce && !work_restart[thr_id].restart)
     {
-        neoscrypt((uint8_t *) hash, (uint8_t *) pdata, profile);
+        if (byteswap)
+          encode_as_bigendian (*nonce, &data[76]);
+
+        neoscrypt((uint8_t *) hash, pdata, profile);
 
         /* Quick hash check */
         if (hash[7] <= Htarg && fulltest_le(hash, ptarget)) {
             work_set_target_ratio(work, hash);
-            *hashes_done = pdata[19] - first_nonce + 1;
+            *hashes_done = *nonce - first_nonce + 1;
             return 1;
         }
 
-        pdata[19]++;
+        ++(*nonce);
     }
 
-    *hashes_done = pdata[19] - first_nonce;
+    *hashes_done = *nonce - first_nonce;
     return 0;
 }

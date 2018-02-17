@@ -190,6 +190,7 @@ static const char *algo_names[] = {
 	"\0"
 };
 
+bool opt_neoscrypt_byteswap = false;
 bool opt_debug = false;
 bool opt_debug_diff = false;
 bool opt_protocol = false;
@@ -342,6 +343,7 @@ Options:\n\
                           xevan        Xevan (BitSend)\n\
                           yescrypt     Yescrypt\n\
                           zr5          ZR5\n\
+      --neoscrypt-byteswap  Swap byte order in Neoscrypt\n\
   -o, --url=URL         URL of mining server\n\
   -O, --userpass=U:P    username:password pair for mining server\n\
   -u, --user=USERNAME   username for mining server\n\
@@ -403,6 +405,7 @@ static char const short_options[] =
 
 static struct option const options[] = {
 	{ "algo", 1, NULL, 'a' },
+        { "neoscrypt-byteswap", 0, NULL, 1100 },
 	{ "api-bind", 1, NULL, 'b' },
 	{ "api-remote", 0, NULL, 1030 },
 	{ "background", 0, NULL, 'B' },
@@ -2263,7 +2266,7 @@ static void *miner_thread(void *userdata)
 			break;
 		case ALGO_NEOSCRYPT:
 			rc = scanhash_neoscrypt(thr_id, &work, max_nonce, &hashes_done,
-				0x80000020 | (opt_nfactor << 8));
+				0x80000020 | (opt_nfactor << 8), opt_neoscrypt_byteswap);
 			break;
 		case ALGO_NIST5:
 			rc = scanhash_nist5(thr_id, &work, max_nonce, &hashes_done);
@@ -2887,6 +2890,9 @@ void parse_arg(int key, char *arg)
 			opt_nfactor = 9;
 		if (opt_algo == ALGO_SCRYPTJANE && opt_scrypt_n == 0)
 			opt_scrypt_n = 5;
+		break;
+	case 1100:
+		opt_neoscrypt_byteswap = true;
 		break;
 	case 'b':
 		p = strstr(arg, ":");
